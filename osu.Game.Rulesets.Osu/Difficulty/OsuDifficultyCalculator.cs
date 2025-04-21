@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
@@ -18,7 +19,7 @@ using osu.Game.Rulesets.Osu.Objects;
 
 namespace osu.Game.Rulesets.Osu.Difficulty
 {
-    public class OsuDifficultyCalculator : DifficultyCalculator
+    public class OsuDifficultyCalculator : DifficultyCalculator, IStrainCalculator
     {
         private const double difficulty_multiplier = 0.0675;
 
@@ -131,6 +132,30 @@ namespace osu.Game.Rulesets.Osu.Difficulty
             return objects;
         }
 
+        public Dictionary<StrainSkill, List<double>> CalculateStrain()
+        {
+            preProcess(Array.Empty<Mod>(), CancellationToken.None);
+
+            List<DifficultyHitObject> objects = getDifficultyHitObjects().ToList();
+            Dictionary<StrainSkill, List<double>> skillsToStrains = new Dictionary<StrainSkill, List<double>>
+            {
+                { new Aim(Array.Empty<Mod>(), true), new List<double>(objects.Count) },
+                { new Speed(Array.Empty<Mod>()), new List<double>(objects.Count) },
+            };
+
+            foreach ((StrainSkill skill, List<double> list) in skillsToStrains)
+            {
+                foreach (DifficultyHitObject obj in objects)
+                {
+                    skill.Process(obj);
+                }
+
+                list.AddRange(skill.ObjectStrains);
+            }
+
+            return skillsToStrains;
+        }
+
         protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods, double clockRate)
         {
             var skills = new List<Skill>
@@ -156,5 +181,7 @@ namespace osu.Game.Rulesets.Osu.Difficulty
             new OsuModFlashlight(),
             new MultiMod(new OsuModFlashlight(), new OsuModHidden())
         };
+
+
     }
 }
